@@ -29,6 +29,8 @@ DimmerItem.prototype.callBack = function (value) { // Loxone > Homebridge
         this.otherService
             .getCharacteristic(this.homebridge.hap.Characteristic.Brightness)
             .updateValue(this.currentState);
+
+        this.updateMatterState();
     }
 };
 
@@ -92,6 +94,53 @@ DimmerItem.prototype.setItemPowerState = async function (value, callback) {
     }
 
     callback();
+};
+
+DimmerItem.prototype.getMatterDeviceType = function (matter) {
+    return matter.deviceTypes.DimmableLight;
+};
+
+DimmerItem.prototype.getMatterStaticClusters = function () {
+    return { levelControl: { minLevel: 1, maxLevel: 254 } };
+};
+
+DimmerItem.prototype.getMatterState = function () {
+    const brightness = Number(this.currentState) || 0;
+    // Matter keeps the last level while the light is off
+    if (brightness > 0) {
+        this.matterLevel = Math.min(254, Math.max(1, Math.round(brightness * 2.54)));
+    }
+    return {
+        onOff: { onOff: brightness > 0 },
+        levelControl: { currentLevel: this.matterLevel || 254 }
+    };
+};
+
+DimmerItem.prototype.getMatterHandlers = function () {
+    // Loxone updates are ignored for a short time after a command, so keep the local state in sync ourselves
+    const setLevel = (request) => {
+        const brightness = Math.round(request.level / 2.54);
+        this.setItemState(brightness, () => {});
+        this.currentState = brightness;
+        this.matterLevel = request.level;
+    };
+
+    return {
+        onOff: {
+            on: async () => {
+                await this.setItemPowerState(1, () => {});
+                this.currentState = this.lastBrightnessValue || 100;
+            },
+            off: async () => {
+                await this.setItemPowerState(0, () => {});
+                this.currentState = 0;
+            }
+        },
+        levelControl: {
+            moveToLevel: setLevel,
+            moveToLevelWithOnOff: setLevel
+        }
+    };
 };
 
 module.exports = DimmerItem;

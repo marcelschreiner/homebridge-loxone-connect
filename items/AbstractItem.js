@@ -1,5 +1,3 @@
-const WSListener = require('../libs/WSListener.js');
-
 const AbstractItem = function(widget,platform,homebridge) {
     this.platform = platform;
     this.widget =  widget;
@@ -8,16 +6,13 @@ const AbstractItem = function(widget,platform,homebridge) {
     this.name = widget.name;
     this.roomname = widget.roomname;
     this.UUID = homebridge.hap.uuid.generate(String(widget.uuidAction));
-    
+
     // provide explicit UUID to prevent automatic UUID generation by homebridge (which would fail because of possibly equal item name)
     this.uuid_base = this.UUID;
-    
-	// console.log("Generating new homebridge accessory '" + this.name + "' with UUID: " + this.UUID + " from accessory with ID: " + widget.uuidAction);
 
-    //Add as ACCESSORY (parent class)
-    //AbstractItem.super_.call(this, this.name, this.UUID);
-    new homebridge.platformAccessory(this.name, this.UUID);
-
+    // set by the platform once the item has been registered as Matter accessory
+    this.matter = undefined;
+    this.matterRegistered = false;
 };
 
 AbstractItem.prototype.getServices = function() {
@@ -40,6 +35,106 @@ AbstractItem.prototype.getInformationServices = function() {
         .setCharacteristic(this.homebridge.hap.Characteristic.SerialNumber, this.widget.uuidAction)
         .setCharacteristic(this.homebridge.hap.Characteristic.Name, this.name);
     return informationService;
+};
+
+//* Matter *//
+// Items that can be exposed via Matter override getMatterDeviceType, getMatterState and (optionally)
+// getMatterHandlers / getMatterStaticClusters. Items returning no device type stay HAP only.
+
+AbstractItem.prototype.getMatterDeviceType = () => {
+    return null;
+};
+
+// current state of the item as Matter cluster attributes, e.g. { onOff: { onOff: true } }
+AbstractItem.prototype.getMatterState = () => {
+    return {};
+};
+
+// attributes that never change at runtime (ranges, types, ...), only used for the initial registration
+AbstractItem.prototype.getMatterStaticClusters = () => {
+    return {};
+};
+
+AbstractItem.prototype.getMatterHandlers = () => {
+    return undefined;
+};
+
+AbstractItem.prototype.getMatterAccessory = function(matter) {
+    const deviceType = this.getMatterDeviceType(matter);
+    if (!deviceType) {
+        return null;
+    }
+
+    const clusters = this.getMatterStaticClusters(matter);
+    const state = this.getMatterState(matter);
+    for (const cluster in state) {
+        clusters[cluster] = Object.assign({}, clusters[cluster], state[cluster]);
+    }
+
+    // Matter limits labels and serial numbers to 32 characters
+    return {
+        UUID: this.UUID,
+        displayName: String(this.name).slice(0, 32),
+        deviceType: deviceType,
+        serialNumber: this.UUID.replace(/-/g, '').slice(0, 32),
+        manufacturer: 'Loxone',
+        model: `Room: ${this.roomname}`.slice(0, 32),
+        context: {
+            uuidAction: this.widget.uuidAction
+        },
+        clusters: clusters,
+        handlers: this.wrapMatterHandlers(this.getMatterHandlers(matter))
+    };
+};
+
+// Handlers get logged on failure and trigger a state resync afterwards, because the state Homebridge
+// assumes after a command is not always the state Loxone ends up in (e.g. a radio switch that can't be switched off)
+AbstractItem.prototype.wrapMatterHandlers = function(handlers) {
+    if (!handlers) {
+        return undefined;
+    }
+
+    const wrapped = {};
+    for (const cluster in handlers) {
+        wrapped[cluster] = {};
+        for (const command in handlers[cluster]) {
+            const handler = handlers[cluster][command];
+            wrapped[cluster][command] = async (args, context) => {
+                try {
+                    await handler(args || {}, context);
+                } catch (error) {
+                    this.log.error(`[Matter] - ${this.name}: ${cluster}.${command} failed: ${error}`);
+                    throw error;
+                }
+                clearTimeout(this.matterResyncTimer);
+                this.matterResyncTimer = setTimeout(() => this.updateMatterState(), 1500);
+            };
+        }
+    }
+    return wrapped;
+};
+
+// push the current item state to Matter, call this whenever the state changed
+AbstractItem.prototype.updateMatterState = function() {
+    if (!this.matter || !this.matterRegistered) {
+        return;
+    }
+
+    const state = this.getMatterState(this.matter);
+    for (const cluster in state) {
+        this.matter.updateAccessoryState(this.UUID, cluster, state[cluster])
+            .catch(error => this.log.debug(`[Matter] - ${this.name}: could not update ${cluster}: ${error}`));
+    }
+};
+
+// stateless buttons (GenericSwitch) fire events instead of keeping a state
+AbstractItem.prototype.emitMatterPress = function() {
+    if (!this.matter || !this.matterRegistered) {
+        return;
+    }
+
+    this.matter.switch.emitGesture(this.UUID, 'singlePress')
+        .catch(error => this.log.debug(`[Matter] - ${this.name}: could not send button press: ${error}`));
 };
 
 module.exports = AbstractItem;

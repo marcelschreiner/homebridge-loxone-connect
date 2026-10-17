@@ -20,6 +20,8 @@ HumiditySensorItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.CurrentRelativeHumidity)
         .setValue(this.currentHumidity);
+
+    this.updateMatterState();
 };
 
 HumiditySensorItem.prototype.getOtherServices = function() {
@@ -34,6 +36,16 @@ HumiditySensorItem.prototype.getOtherServices = function() {
 
 HumiditySensorItem.prototype.getItemState = function(callback) {
    callback(undefined, this.currentHumidity);
+};
+
+HumiditySensorItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.HumiditySensor;
+};
+
+HumiditySensorItem.prototype.getMatterState = function() {
+    // hundredths of a percent, null means unknown
+    const value = parseFloat(this.currentHumidity);
+    return { relativeHumidityMeasurement: { measuredValue: isNaN(value) ? null : Math.min(10000, Math.max(0, Math.round(value * 100))) } };
 };
 
 module.exports = HumiditySensorItem;

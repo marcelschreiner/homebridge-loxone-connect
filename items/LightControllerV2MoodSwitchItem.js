@@ -28,6 +28,8 @@ LightControllerV2MoodSwitchItem.prototype.callBackActiveMoods = function (value)
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.On)
         .updateValue(this.currentState);
+
+    this.updateMatterState();
 };
 
 LightControllerV2MoodSwitchItem.prototype.getOtherServices = function () {
@@ -79,4 +81,21 @@ LightControllerV2MoodSwitchItem.prototype.setItemState = function (value, callba
 
 };
 
-module.exports = LightControllerV2MoodSwitchItem;
+LightControllerV2MoodSwitchItem.prototype.getMatterDeviceType = function (matter) {
+    return matter.deviceTypes.OnOffSwitch;
+};
+
+LightControllerV2MoodSwitchItem.prototype.getMatterState = function () {
+    return { onOff: { onOff: Boolean(this.currentState) } };
+};
+
+LightControllerV2MoodSwitchItem.prototype.getMatterHandlers = function () {
+    return {
+        onOff: {
+            on: () => this.setItemState(true, () => {}),
+            off: () => this.setItemState(false, () => {})
+        }
+    };
+};
+
+module.exports = LightControllerV2MoodSwitchItem;

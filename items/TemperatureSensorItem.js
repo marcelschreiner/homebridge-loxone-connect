@@ -20,6 +20,8 @@ TemperatureSensorItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.CurrentTemperature)
         .setValue(this.currentTemperature);
+
+    this.updateMatterState();
 };
 
 TemperatureSensorItem.prototype.getOtherServices = function() {
@@ -34,6 +36,16 @@ TemperatureSensorItem.prototype.getOtherServices = function() {
 
 TemperatureSensorItem.prototype.getItemState = function(callback) {
    callback(undefined, this.currentTemperature);
+};
+
+TemperatureSensorItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.TemperatureSensor;
+};
+
+TemperatureSensorItem.prototype.getMatterState = function() {
+    // hundredths of °C, null means unknown
+    const value = parseFloat(this.currentTemperature);
+    return { temperatureMeasurement: { measuredValue: isNaN(value) ? null : Math.round(value * 100) } };
 };
 
 module.exports = TemperatureSensorItem;

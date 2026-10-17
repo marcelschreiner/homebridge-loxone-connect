@@ -27,7 +27,7 @@ The plugin will be able to communicate with the following items from your Loxone
 The only configuration required is the credentials to your Loxone miniserver.
 
 # Prerequisites
-[Homebridge](https://github.com/nfarina/homebridge)
+[Homebridge](https://github.com/homebridge/homebridge) 1.8 or newer, Homebridge 2 is supported (including Matter).
 Follow all the installation steps there.
 
 # Installation
@@ -68,6 +68,8 @@ See config-sample.json for an example configuration.
 | `alarmTrigerLevel` | optional, choose at what level the alarm notification will be send to HomeKit, default: "5". <br/><br/> Has 6 possible values:<br/> * 1 : Silent.<br/> * 2 : Acustic.<br/> * 3 : Optical.<br/> * 4 : Internal.<br/> * 5 : External.<br/> * 6 : Remote. |
 | `autoLock` | optional, whether the lock should automatically lock after being opened, default: "1". |
 | `autoLockDelay` | optional, time (in seconds) until the lock will auto lock if enabled, default: "5". |
+| `hap` | optional, publish the items as HomeKit (HAP) accessories, default: true. |
+| `matter` | optional, publish the items as Matter accessories, default: true. Only has an effect on Homebridge 2 with Matter enabled on the bridge, check [Matter](#matter). |
 
 ### Assumption aliases
 
@@ -91,6 +93,33 @@ See config-sample.json for an example configuration.
 | `DefaultMood` | LightControllerV2 default mood alias. (Default 'Off') |
 
 For more information check [assumptions](#assumptions).
+
+# Matter
+
+Starting with Homebridge 2, the plugin can also expose your Loxone items via [Matter](https://csa-iot.org/all-solutions/matter/), so they can be used with Apple Home, Google Home, Amazon Alexa, SmartThings and other Matter controllers.
+
+1. Update to Homebridge 2.
+2. Enable Matter for the bridge the plugin runs on (Homebridge UI: bridge settings, or add a `"matter": {}` block to `bridge` in your config.json, or to `_bridge` when running the plugin as child bridge).
+3. Restart Homebridge and pair the Matter bridge with the Matter QR code / pairing code shown in the Homebridge UI.
+
+HomeKit (HAP) and Matter work side by side. If you pair both with Apple Home, every item shows up twice: set `"hap": false` in the options to only use Matter, or `"matter": false` to only use HomeKit.
+
+| Loxone item | Matter device type |
+| --- | --- |
+| Switch, Stairwell switch, Pushbutton, Radio switch, Mood | On/Off Switch |
+| Lightbulb | On/Off Light |
+| Dimmer | Dimmable Light |
+| Color picker (RGB / LightControllerV2) | Extended Color Light |
+| Outlet | On/Off Plug-in Unit |
+| Fan | Fan (off / high) |
+| Window blinds (Jalousie) | Window Covering (lift, with slat tilt for shutters) |
+| Lock | Door Lock |
+| Valve, Sprinklers | Water Valve |
+| Temperature, Humidity, Light, Motion, Contact, Leak and Smoke sensor | matching Matter sensor |
+| Doorbell, Trigger | Generic Switch (button press) |
+| Gate, Alarm system | not available via Matter, HomeKit only |
+
+Whether a device type is shown and controllable depends on the Matter controller (e.g. Apple Home doesn't support every Matter device type yet).
 
 # Assumptions
 To create the correct accessory type from Loxone items, some attribute parsing is required inside Loxone config.<br/>

@@ -25,6 +25,8 @@ RadioSwitchItem.prototype.callBackActiveOutput = function (value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.On)
         .updateValue(this.currentState);
+
+    this.updateMatterState();
 };
 
 RadioSwitchItem.prototype.getOtherServices = function () {
@@ -75,4 +77,21 @@ RadioSwitchItem.prototype.setItemState = function (value, callback) {
 
 };
 
-module.exports = RadioSwitchItem;
+RadioSwitchItem.prototype.getMatterDeviceType = function (matter) {
+    return matter.deviceTypes.OnOffSwitch;
+};
+
+RadioSwitchItem.prototype.getMatterState = function () {
+    return { onOff: { onOff: Boolean(this.currentState) } };
+};
+
+RadioSwitchItem.prototype.getMatterHandlers = function () {
+    return {
+        onOff: {
+            on: () => this.setItemState(true, () => {}),
+            off: () => this.setItemState(false, () => {})
+        }
+    };
+};
+
+module.exports = RadioSwitchItem;

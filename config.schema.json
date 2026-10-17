@@ -72,6 +72,18 @@
                         "type": "integer",
                         "default": "5",
                         "description": "Optional, time (in seconds) until the lock will auto lock if enabled, default: '5'."
+                    },
+                    "hap": {
+                        "type": "boolean",
+                        "title": "Expose via HomeKit (HAP)",
+                        "default": true,
+                        "description": "Optional, publish the Loxone items as HomeKit (HAP) accessories, default: on. Turn this off if you only want to use Matter."
+                    },
+                    "matter": {
+                        "type": "boolean",
+                        "title": "Expose via Matter",
+                        "default": true,
+                        "description": "Optional, publish the Loxone items as Matter accessories, default: on. Requires Homebridge 2 with Matter enabled on the bridge (or the child bridge) this plugin runs on."
                     }
                 }
             },

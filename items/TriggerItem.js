@@ -17,6 +17,10 @@ TriggerItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.ProgrammableSwitchEvent)
         .setValue(value == '1');
+
+    if (value == '1') {
+        this.emitMatterPress();
+    }
 };
 
 TriggerItem.prototype.getOtherServices = function() {
@@ -25,6 +29,14 @@ TriggerItem.prototype.getOtherServices = function() {
     otherService.getCharacteristic(this.homebridge.hap.Characteristic.ProgrammableSwitchEvent);
 
     return otherService;
+};
+
+TriggerItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.GenericSwitch;
+};
+
+TriggerItem.prototype.getMatterStaticClusters = function() {
+    return { switch: { numberOfPositions: 2, currentPosition: 0 } };
 };
 
 module.exports = TriggerItem;

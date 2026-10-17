@@ -73,6 +73,8 @@ ShuttersItem.prototype.positionCallback = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.CurrentPosition)
         .updateValue(value);
+
+    this.updateMatterState();
 };
 
 ShuttersItem.prototype.slateCallback = function(value) {
@@ -103,6 +105,8 @@ ShuttersItem.prototype.slateCallback = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.CurrentHorizontalTiltAngle)
         .updateValue(value);
+
+    this.updateMatterState();
 };
 
 ShuttersItem.prototype.getOtherServices = function() {
@@ -208,6 +212,53 @@ ShuttersItem.prototype.setBoth = function(positionValue, slateValue, callback) {
     this.log(`[Shutters] HomeKit - send message to ${this.name}: ${command}`);
     this.platform.ws.sendCommand(this.uuidAction, command);
     callback();
+};
+
+//Matter uses 0 = open and 10000 = closed for lift, and 0 = horizontal and 10000 = vertical (closed) for tilt
+//HomeKit uses 100 = open for lift and -90 to 90 degrees for tilt
+ShuttersItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.WindowCovering;
+};
+
+ShuttersItem.prototype.getMatterStaticClusters = function() {
+    // position aware lift and tilt are needed for the percentage attributes
+    return {
+        windowCovering: {
+            type: 8, // TiltBlindLiftAndTilt
+            configStatus: { operational: true, onlineReserved: true, liftMovementReversed: false, liftPositionAware: true,
+                tiltPositionAware: true, liftEncoderControlled: false, tiltEncoderControlled: false }
+        }
+    };
+};
+
+ShuttersItem.prototype.getMatterState = function() {
+    const tilt = angle => Math.min(10000, Math.max(0, Math.round((angle + 90) / 180 * 10000)));
+    return {
+        windowCovering: {
+            currentPositionLiftPercent100ths: Math.round((100 - this.currentPosition) * 100),
+            targetPositionLiftPercent100ths: Math.round((100 - this.targetPosition) * 100),
+            currentPositionTiltPercent100ths: tilt(this.currentSlatePosition),
+            targetPositionTiltPercent100ths: tilt(this.targetSlatePosition)
+        }
+    };
+};
+
+ShuttersItem.prototype.getMatterHandlers = function() {
+    const noop = () => {};
+    return {
+        windowCovering: {
+            upOrOpen: () => this.setItem(100, noop),
+            downOrClose: () => this.setItem(0, noop),
+            stopMotion: () => {
+                this.targetPosition = this.currentPosition;
+                this.targetSlatePosition = this.currentSlatePosition;
+                this.log(`[Shutters] Matter - send message to ${this.name}: stop`);
+                this.platform.ws.sendCommand(this.uuidAction, 'stop');
+            },
+            goToLiftPercentage: (request) => this.setItem(Math.round(100 - request.liftPercent100thsValue / 100), noop),
+            goToTiltPercentage: (request) => this.setSlate(Math.round(request.tiltPercent100thsValue / 10000 * 180 - 90), noop)
+        }
+    };
 };
 
 module.exports = ShuttersItem;

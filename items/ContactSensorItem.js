@@ -21,6 +21,8 @@ ContactSensorItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.ContactSensorState)
         .setValue(this.isClosed);
+
+    this.updateMatterState();
 };
 
 ContactSensorItem.prototype.getOtherServices = function() {
@@ -35,6 +37,16 @@ ContactSensorItem.prototype.getOtherServices = function() {
 
 ContactSensorItem.prototype.getItemState = function(callback) {
    callback(undefined, this.isClosed);
+};
+
+ContactSensorItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.ContactSensor;
+};
+
+ContactSensorItem.prototype.getMatterState = function() {
+    // same meaning as in HomeKit: 0 = contact detected (closed), 1 = no contact (open)
+    // in Matter, true means contact detected
+    return { booleanState: { stateValue: this.isClosed == 0 } };
 };
 
 module.exports = ContactSensorItem;

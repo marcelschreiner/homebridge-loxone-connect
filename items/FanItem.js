@@ -15,4 +15,33 @@ FanItem.prototype.getOtherServices = function() {
     return otherService;
 };
 
+//Loxone only knows on/off for a fan, so Matter gets a fan with the modes off/high (0% or 100%)
+FanItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.Fan;
+};
+
+FanItem.prototype.getMatterStaticClusters = function() {
+    return { fanControl: { fanModeSequence: 1 } }; // Off/Low/High
+};
+
+FanItem.prototype.getMatterState = function() {
+    const isOn = this.currentState == '1';
+    return {
+        fanControl: {
+            fanMode: isOn ? 3 : 0, // High : Off
+            percentSetting: isOn ? 100 : 0,
+            percentCurrent: isOn ? 100 : 0
+        }
+    };
+};
+
+FanItem.prototype.getMatterHandlers = function() {
+    return {
+        fanControl: {
+            fanModeChange: (request) => this.setItemState(request.fanMode !== 0, () => {}),
+            percentSettingChange: (request) => this.setItemState((request.percentSetting || 0) > 0, () => {})
+        }
+    };
+};
+
 module.exports = FanItem;

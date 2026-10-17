@@ -1,5 +1,12 @@
 
 # Change Log
+## [1.5.0] - 2026/10/17
+
+- Homebridge 2 support (and Homebridge 1.8+), the plugin is now a dynamic platform. Existing HomeKit accessories keep their identity, rooms and automations are preserved.
+- Matter support: on Homebridge 2 with Matter enabled on the bridge, all supported Loxone items are also exposed via Matter (new options `hap` and `matter`).
+- Fixed a crash when filtering by rooms and when no `alias` is configured with mood switches.
+- Removed the unused axios import.
+
 ## [1.4.1] - 2023/01/03
 
 - Fixed assumptions related issues

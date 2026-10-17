@@ -13,6 +13,7 @@ PushbuttonItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.On)
         .setValue(this.currentState == '1');
+    this.updateMatterState();
 
     //and then set state back to off, since pushbuttons don't keep states
     setTimeout(() => {
@@ -20,6 +21,7 @@ PushbuttonItem.prototype.callBack = function(value) {
         this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.On)
         .setValue(false);
+        this.updateMatterState();
     }, 1000);
 
 };

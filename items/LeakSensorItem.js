@@ -13,7 +13,9 @@ LeakSensor.prototype.initListener = function() {
     
 LeakSensor.prototype.callBack = function(value) {
     //console.log(`Got new state for LeakSensor: ${value}`);
+    this.leakDetected = value;
     this.otherService.getCharacteristic(this.homebridge.hap.Characteristic.LeakDetected).updateValue(value);
+    this.updateMatterState();
 };
 
 LeakSensor.prototype.getOtherServices = function() {
@@ -21,6 +23,14 @@ LeakSensor.prototype.getOtherServices = function() {
     const otherService = new this.homebridge.hap.Service.LeakSensor();
 
     return otherService;
+};
+
+LeakSensor.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.LeakSensor;
+};
+
+LeakSensor.prototype.getMatterState = function() {
+    return { booleanState: { stateValue: this.leakDetected == 1 } };
 };
 
 module.exports = LeakSensor;

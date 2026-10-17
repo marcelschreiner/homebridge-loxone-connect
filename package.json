@@ -1,6 +1,6 @@
 {
   "name": "homebridge-loxone-connect",
-  "version": "1.3.2",
+  "version": "1.5.0",
   "description": "Homebridge plugin for controlling Loxone.",
   "main": "index.js",
   "repository": {
@@ -13,7 +13,8 @@
     "homebridge-plugin",
     "Siri",
     "HomeKit",
-    "iOS"
+    "iOS",
+    "Matter"
   ],
   "author": "Michaël Perdaens",
   "license": "MIT",
@@ -21,8 +22,8 @@
     "url": "https://github.com/ActiveByte/homebridge-loxone-connect/issues"
   },
   "engines": {
-    "node": ">=0.12.0",
-    "homebridge": ">=0.2.0"
+    "node": "^18.20.4 || ^20.18.0 || ^22.10.0 || ^24.0.0 || ^26.0.0",
+    "homebridge": "^1.8.0 || ^2.0.0"
   },
   "dependencies": {
     "lxcommunicator": "^1.1.1",

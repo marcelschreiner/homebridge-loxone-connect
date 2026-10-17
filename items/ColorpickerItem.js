@@ -187,6 +187,42 @@ function colorTemperatureToRGB(kelvin){
     }
 }
 
+// HSV (h: 0-360, s: 0-100) <-> CIE xy, used for Matter which requires xy support on color lights
+function hsvToRgb(h, s, v) {
+    h = (h % 360) / 60;
+    const c = v * s;
+    const x = c * (1 - Math.abs((h % 2) - 1));
+    const m = v - c;
+    const rgb = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][Math.floor(h) % 6];
+    return { r: (rgb[0] + m) * 255, g: (rgb[1] + m) * 255, b: (rgb[2] + m) * 255 };
+}
+
+function hsToXy(hue, saturation) {
+    const rgb = hsvToRgb(hue, saturation / 100, 1);
+    const linear = c => { c /= 255; return c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92; };
+    const r = linear(rgb.r), g = linear(rgb.g), b = linear(rgb.b);
+    const X = r * 0.4124 + g * 0.3576 + b * 0.1805;
+    const Y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    const Z = r * 0.0193 + g * 0.1192 + b * 0.9505;
+    const sum = X + Y + Z;
+    return sum === 0 ? { x: 0.3127, y: 0.3290 } : { x: X / sum, y: Y / sum };
+}
+
+function xyToHs(x, y) {
+    if (y === 0) {
+        return { h: 0, s: 0 };
+    }
+    const X = x / y, Z = (1 - x - y) / y;
+    const gamma = c => { c = Math.max(0, c); return c <= 0.0031308 ? 12.92 * c : 1.055 * (c ** (1 / 2.4)) - 0.055; };
+    let r = gamma(X * 3.2406 - 1.5372 - Z * 0.4986);
+    let g = gamma(-X * 0.9689 + 1.8758 + Z * 0.0415);
+    let b = gamma(X * 0.0557 - 0.2040 + Z * 1.0570);
+    const max = Math.max(r, g, b, 1e-6);
+    r = clamp(r / max, 0, 1); g = clamp(g / max, 0, 1); b = clamp(b / max, 0, 1);
+    const hsv = rgbToHsv(r * 255, g * 255, b * 255);
+    return { h: Math.round(hsv.h * 360), s: Math.round(hsv.s * 100) };
+}
+
 function clamp( x, min, max ) {
     if(x<min){ return min; }
     if(x>max){ return max; }
@@ -276,6 +312,8 @@ ColorItem.prototype.callBack = function(value) { // Update info from Loxone to H
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.Brightness)
         .updateValue(this.brightness);
+
+    this.updateMatterState();
 };
 
 ColorItem.prototype.getOtherServices = function() {
@@ -392,6 +430,91 @@ ColorItem.prototype.setColorState = function(callback) {
     this.power = this.brightness > 0;
     
     callback();
+};
+
+ColorItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.ExtendedColorLight;
+};
+
+ColorItem.prototype.getMatterStaticClusters = function() {
+    return {
+        levelControl: { minLevel: 1, maxLevel: 254 },
+        colorControl: {
+            colorTempPhysicalMinMireds: Math.round(1000000 / 6500),
+            colorTempPhysicalMaxMireds: Math.round(1000000 / 2700),
+            coupleColorTempToLevelMinMireds: Math.round(1000000 / 6500)
+        }
+    };
+};
+
+ColorItem.prototype.getMatterState = function() {
+    // Matter keeps the last level while the light is off
+    if (this.brightness > 0) {
+        this.matterLevel = Math.min(254, Math.max(1, Math.round(this.brightness * 2.54)));
+    }
+    const xy = hsToXy(this.hue, this.saturation);
+
+    return {
+        onOff: { onOff: Boolean(this.power) },
+        levelControl: { currentLevel: this.matterLevel || 254 },
+        colorControl: {
+            colorMode: this.lastsetmode == 'colortemperature' ? 2 : 0,
+            currentHue: Math.min(254, Math.round(this.hue / 360 * 254)),
+            currentSaturation: Math.min(254, Math.round(this.saturation / 100 * 254)),
+            currentX: Math.round(xy.x * 65535),
+            currentY: Math.round(xy.y * 65535),
+            colorTemperatureMireds: Math.round(1000000 / homekitToLoxoneColorTemperature(this.colortemperature, this))
+        }
+    };
+};
+
+ColorItem.prototype.getMatterHandlers = function() {
+    const noop = () => {};
+    // a single color change from Matter can call several handlers (hue and saturation), send them as one command
+    const sendColor = () => {
+        clearTimeout(this.matterColorTimer);
+        this.matterColorTimer = setTimeout(() => this.setColorState(noop), 50);
+    };
+    const setColor = (hue, saturation) => {
+        this.lastsetmode = 'color';
+        this.hue = hue;
+        this.saturation = saturation;
+        sendColor();
+    };
+    const setLevel = (request) => this.setItemBrightnessState(Math.round(request.level / 2.54), noop);
+
+    return {
+        onOff: {
+            on: () => {
+                if (!this.power) {
+                    this.brightness = this.matterLevel ? Math.max(1, Math.round(this.matterLevel / 2.54)) : 100;
+                    this.setColorState(noop);
+                }
+            },
+            off: () => this.setItemPowerState(false, noop)
+        },
+        levelControl: {
+            moveToLevel: setLevel,
+            moveToLevelWithOnOff: setLevel
+        },
+        colorControl: {
+            moveToHueAndSaturationLogic: (request) => setColor(Math.round(request.hue / 254 * 360), Math.round(request.saturation / 254 * 100)),
+            moveToHueLogic: (request) => setColor(Math.round(request.targetHue / 254 * 360), this.saturation),
+            moveToSaturationLogic: (request) => setColor(this.hue, Math.round(request.targetSaturation / 254 * 100)),
+            moveToColorLogic: (request) => {
+                const hs = xyToHs(request.targetX / 65535, request.targetY / 65535);
+                setColor(hs.h, hs.s);
+            },
+            moveToColorTemperatureLogic: (request) => {
+                const kelvin = clamp(Math.round(1000000 / request.colorTemperatureMireds), 2700, 6500);
+                this.lastsetmode = 'colortemperature';
+                this.colortemperature = loxoneToHomekitColorTemperature(kelvin, this);
+                sendColor();
+            },
+            // Loxone applies colors immediately, there is no movement to stop
+            stopAllColorMovement: noop
+        }
+    };
 };
 
 module.exports = ColorItem;

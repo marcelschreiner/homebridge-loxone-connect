@@ -1,4 +1,3 @@
-const axios = require('axios');
 const LxCommunicator = require('lxcommunicator');
 const WebSocketConfig = LxCommunicator.WebSocketConfig;
 const {

@@ -23,6 +23,8 @@ MotionSensorItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.MotionDetected)
         .setValue(this.motiondetected);
+
+    this.updateMatterState();
 };
 
 MotionSensorItem.prototype.getOtherServices = function() {
@@ -37,6 +39,14 @@ MotionSensorItem.prototype.getOtherServices = function() {
 
 MotionSensorItem.prototype.getItemState = function(callback) {
    callback(undefined, this.motiondetected);
+};
+
+MotionSensorItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.MotionSensor;
+};
+
+MotionSensorItem.prototype.getMatterState = function() {
+    return { occupancySensing: { occupancy: { occupied: this.motiondetected == 1 } } };
 };
 
 module.exports = MotionSensorItem;

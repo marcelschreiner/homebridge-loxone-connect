@@ -21,6 +21,7 @@ Doorbell.prototype.callBack = function(value) {
             this.busy = true;
             this.otherService.getCharacteristic(this.homebridge.hap.Characteristic.ProgrammableSwitchEvent).updateValue(this.state);
             this.stepState();
+            this.emitMatterPress();
         }
 
         if (this.timeout) {
@@ -55,6 +56,14 @@ Doorbell.prototype.stepState = function() {
 
 Doorbell.prototype.getState = function(callback) {
     callback(undefined, this.state);
+};
+
+Doorbell.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.GenericSwitch;
+};
+
+Doorbell.prototype.getMatterStaticClusters = function() {
+    return { switch: { numberOfPositions: 2, currentPosition: 0 } };
 };
 
 module.exports = Doorbell;

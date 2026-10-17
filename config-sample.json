@@ -11,7 +11,9 @@
         "alarmSystem": "delayedon",
         "alarmTrigerLevel": 5,
         "autoLock": 1,
-        "autoLockDelay": 5
+        "autoLockDelay": 5,
+        "hap": true,
+        "matter": true
     },
     "alias": {
         "Lighting": "Lighting",

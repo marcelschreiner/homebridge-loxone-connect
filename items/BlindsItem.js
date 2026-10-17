@@ -65,6 +65,8 @@ BlindsItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.CurrentPosition)
         .updateValue(value);
+
+    this.updateMatterState();
 };
 
 BlindsItem.prototype.getOtherServices = function() {
@@ -123,6 +125,47 @@ BlindsItem.prototype.setItem = function(value, callback) {
     this.platform.ws.sendCommand(this.uuidAction, command);
     callback();
 
+};
+
+//Matter uses 0 = open and 10000 = closed, HomeKit 100 = open and 0 = closed
+BlindsItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.WindowCovering;
+};
+
+BlindsItem.prototype.getMatterStaticClusters = function() {
+    // position aware lift is needed for the percentage attributes
+    return {
+        windowCovering: {
+            type: 0, // Rollershade
+            configStatus: { operational: true, onlineReserved: true, liftMovementReversed: false, liftPositionAware: true,
+                tiltPositionAware: false, liftEncoderControlled: false, tiltEncoderControlled: false }
+        }
+    };
+};
+
+BlindsItem.prototype.getMatterState = function() {
+    return {
+        windowCovering: {
+            currentPositionLiftPercent100ths: Math.round((100 - this.currentPosition) * 100),
+            targetPositionLiftPercent100ths: Math.round((100 - this.targetPosition) * 100)
+        }
+    };
+};
+
+BlindsItem.prototype.getMatterHandlers = function() {
+    const noop = () => {};
+    return {
+        windowCovering: {
+            upOrOpen: () => this.setItem(100, noop),
+            downOrClose: () => this.setItem(0, noop),
+            stopMotion: () => {
+                this.targetPosition = this.currentPosition;
+                this.log(`[Blinds] Matter - send message to ${this.name}: stop`);
+                this.platform.ws.sendCommand(this.uuidAction, 'stop');
+            },
+            goToLiftPercentage: (request) => this.setItem(Math.round(100 - request.liftPercent100thsValue / 100), noop)
+        }
+    };
 };
 
 module.exports = BlindsItem;

@@ -23,6 +23,8 @@ LightSensorItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.CurrentAmbientLightLevel)
         .setValue(this.lightlevel);
+
+    this.updateMatterState();
 };
 
 LightSensorItem.prototype.getOtherServices = function() {
@@ -37,6 +39,20 @@ LightSensorItem.prototype.getOtherServices = function() {
 
 LightSensorItem.prototype.getItemState = function(callback) {
    callback(undefined, this.lightlevel);
+};
+
+LightSensorItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.LightSensor;
+};
+
+LightSensorItem.prototype.getMatterState = function() {
+    // Matter uses a logarithmic scale: 10000 * log10(lux) + 1, 0 means too low to be measured
+    const lux = parseFloat(this.lightlevel);
+    let measuredValue = 0;
+    if (lux > 0) {
+        measuredValue = Math.min(65534, Math.max(1, Math.round(10000 * Math.log10(lux) + 1)));
+    }
+    return { illuminanceMeasurement: { measuredValue: measuredValue } };
 };
 
 module.exports = LightSensorItem;

@@ -15,4 +15,8 @@ OutletItem.prototype.getOtherServices = function() {
     return otherService;
 };
 
+OutletItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.OnOffOutlet;
+};
+
 module.exports = OutletItem;

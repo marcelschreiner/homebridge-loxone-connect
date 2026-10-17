@@ -22,6 +22,8 @@ ValveItem.prototype.callBack = function (value) {
 
     this.otherService.getCharacteristic(Characteristic.Active).updateValue(this.currentState == '1');
     this.otherService.getCharacteristic(Characteristic.InUse).updateValue(this.currentState == '1');
+
+    this.updateMatterState();
 };
 
 ValveItem.prototype.getOtherServices = function () {
@@ -42,6 +44,24 @@ ValveItem.prototype.setItemState = function (value, callback) {
     this.log(`[${this.item}] - send message to ${this.name}: ${command}`);
     this.platform.ws.sendCommand(this.uuidAction, command);
     callback();
+};
+
+ValveItem.prototype.getMatterDeviceType = function (matter) {
+    return matter.deviceTypes.WaterValve;
+};
+
+ValveItem.prototype.getMatterState = function () {
+    const state = this.currentState == '1' ? 1 : 0; // Open : Closed
+    return { valveConfigurationAndControl: { currentState: state, targetState: state } };
+};
+
+ValveItem.prototype.getMatterHandlers = function () {
+    return {
+        valveConfigurationAndControl: {
+            open: () => this.setItemState(1, () => {}),
+            close: () => this.setItemState(0, () => {})
+        }
+    };
 };
 
 module.exports = ValveItem;

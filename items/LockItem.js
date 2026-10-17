@@ -33,6 +33,8 @@ LockItem.prototype.callBack = function (value) {
             this.log(`[Lock] Cancelled autolock`);
         }
     }
+
+    this.updateMatterState();
 };
 
 LockItem.prototype.getOtherServices = function () {
@@ -60,6 +62,30 @@ LockItem.prototype.setItemState = function (value, callback) {
     this.log(`[Lock] - send message to ${this.name}: ${command}`);
     this.platform.ws.sendCommand(this.uuidAction, command);
     callback();
+};
+
+LockItem.prototype.getMatterDeviceType = function (matter) {
+    return matter.deviceTypes.DoorLock;
+};
+
+LockItem.prototype.getMatterStaticClusters = function () {
+    return { doorLock: { lockType: 2, actuatorEnabled: true, operatingMode: 0 } }; // Other, Normal
+};
+
+LockItem.prototype.getMatterState = function () {
+    if (this.currentState === undefined) {
+        return { doorLock: { lockState: null } };
+    }
+    return { doorLock: { lockState: this.currentState ? 1 : 2 } }; // Locked : Unlocked
+};
+
+LockItem.prototype.getMatterHandlers = function () {
+    return {
+        doorLock: {
+            lockDoor: () => this.setItemState(Characteristic.LockTargetState.SECURED, () => {}),
+            unlockDoor: () => this.setItemState(Characteristic.LockTargetState.UNSECURED, () => {})
+        }
+    };
 };
 
 module.exports = LockItem;

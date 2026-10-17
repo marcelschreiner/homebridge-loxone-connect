@@ -15,4 +15,8 @@ LightbulbItem.prototype.getOtherServices = function() {
     return otherService;
 };
 
+LightbulbItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.OnOffLight;
+};
+
 module.exports = LightbulbItem;

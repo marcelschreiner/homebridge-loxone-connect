@@ -23,6 +23,8 @@ SwitchItem.prototype.callBack = function (value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.On)
         .updateValue(this.currentState == '1');
+
+    this.updateMatterState();
 };
 
 SwitchItem.prototype.getOtherServices = function () {
@@ -53,6 +55,23 @@ SwitchItem.prototype.setItemState = function (value, callback) {
         this.platform.ws.sendCommand(this.uuidAction, command);
     }
     callback();
+};
+
+SwitchItem.prototype.getMatterDeviceType = function (matter) {
+    return matter.deviceTypes.OnOffSwitch;
+};
+
+SwitchItem.prototype.getMatterState = function () {
+    return { onOff: { onOff: this.currentState == '1' } };
+};
+
+SwitchItem.prototype.getMatterHandlers = function () {
+    return {
+        onOff: {
+            on: () => this.setItemState(true, () => {}),
+            off: () => this.setItemState(false, () => {})
+        }
+    };
 };
 
 module.exports = SwitchItem;

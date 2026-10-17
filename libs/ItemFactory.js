@@ -93,7 +93,7 @@ moduleexports.Factory.prototype.parseSitemap = function(jsonSitemap) {
 
                     this.log(this.platform.rooms);
                     this.log(controlRoom);
-                    this.log(factory.platform.moodSwitches);
+                    this.log(this.platform.moodSwitches);
                     this.log(this.itemList[key].type);
 
                     if (this.platform.rooms.indexOf(controlRoom) >= 0) {
@@ -335,7 +335,7 @@ moduleexports.Factory.prototype.traverseSitemap = (jsonSitmap, factory) => {
                         if ((control.type == 'LightControllerV2') && ((factory.platform.moodSwitches == 'all') || (factory.platform.moodSwitches == 'only'))) {
                             const moods = JSON.parse(factory.platform.ws.getLastCachedValue(control.states.moodList));
 
-                            const defaultMoodName = factory.platform.alias['DefaultMood'] || "Off";
+                            const defaultMoodName = (factory.platform.alias && factory.platform.alias['DefaultMood']) || "Off";
                             const defaultMood = (moods || []).find(mood => mood.name === defaultMoodName)
 
                             for (const mood of moods) {

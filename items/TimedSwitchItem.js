@@ -30,6 +30,8 @@ TimedSwitchItem.prototype.callBack = function(value) {
     this.otherService
         .getCharacteristic(this.homebridge.hap.Characteristic.On)
         .updateValue(this.currentState);
+
+    this.updateMatterState();
 };
 
 TimedSwitchItem.prototype.getOtherServices = function() {
@@ -61,6 +63,23 @@ TimedSwitchItem.prototype.setItemState = function(value, callback) {
     this.platform.ws.sendCommand(this.uuidAction, command);
     callback();
 
+};
+
+TimedSwitchItem.prototype.getMatterDeviceType = function(matter) {
+    return matter.deviceTypes.OnOffSwitch;
+};
+
+TimedSwitchItem.prototype.getMatterState = function() {
+    return { onOff: { onOff: Boolean(this.currentState) } };
+};
+
+TimedSwitchItem.prototype.getMatterHandlers = function() {
+    return {
+        onOff: {
+            on: () => this.setItemState(true, () => {}),
+            off: () => this.setItemState(false, () => {})
+        }
+    };
 };
 
 module.exports = TimedSwitchItem;
