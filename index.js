@@ -2,8 +2,8 @@ const ItemFactory = require('./libs/ItemFactory.js');
 const Utility = require('./libs/Utility.js');
 const WSListener = require('./libs/WSListener.js');
 
-const PLUGIN_NAME = 'homebridge-loxone-connect';
-const PLATFORM_NAME = 'LoxoneWs';
+const PLUGIN_NAME = 'homebridge-loxone-connect-matter-test';
+const PLATFORM_NAME = 'LoxoneWsMatterTest';
 
 // a HomeKit bridge supports up to 150 accessories, Matter (Homebridge) up to 1000
 const HAP_ACCESSORY_LIMIT = 100;

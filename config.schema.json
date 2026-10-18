@@ -1,5 +1,5 @@
 {
-    "pluginAlias": "LoxoneWs",
+    "pluginAlias": "LoxoneWsMatterTest",
     "pluginType": "platform",
     "singular": true,
     "schema": {
