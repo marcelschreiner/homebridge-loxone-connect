@@ -16,6 +16,11 @@ const MeterItem = function(widget, platform, homebridge) {
     this.actualFactor = unitFactor(details.actualFormat, 1000000); // to mW
     this.totalFactor = unitFactor(details.totalFormat, 1000000); // to mWh
 
+    // producers (e.g. photovoltaics) count the produced energy as positive, but Matter treats
+    // positive power as consumption, so their power and energy are reported in the other direction
+    const productionAlias = (platform.alias && platform.alias['Production']) || 'PV';
+    this.isProduction = String(widget.name).includes(productionAlias);
+
     this.actual = undefined;
     this.total = undefined;
     this.totalNeg = undefined;
@@ -75,20 +80,24 @@ MeterItem.prototype.getMatterState = function() {
     // energy readings can't go back in time, Matter requires them to be positive
     const energy = (value) => value === undefined ? null : { energy: Math.max(0, Math.round(value * this.totalFactor)) };
 
+    // Matter: positive = consumed, negative = produced / fed in
+    const direction = this.isProduction ? -1 : 1;
     const state = {
-        // positive = consumed from the grid, negative = fed in (same sign as Loxone)
         electricalPowerMeasurement: {
-            activePower: this.actual === undefined ? null : Math.round(this.actual * this.actualFactor)
+            activePower: this.actual === undefined ? null : Math.round(direction * this.actual * this.actualFactor) || 0
         }
     };
 
-    if (this.totalUuid || this.totalNegUuid) {
+    // total counts the main direction of the meter, totalNeg the other one
+    const imported = this.isProduction ? this.totalNegUuid : this.totalUuid;
+    const exported = this.isProduction ? this.totalUuid : this.totalNegUuid;
+    if (imported || exported) {
         state.electricalEnergyMeasurement = {};
-        if (this.totalUuid) {
-            state.electricalEnergyMeasurement.cumulativeEnergyImported = energy(this.total);
+        if (imported) {
+            state.electricalEnergyMeasurement.cumulativeEnergyImported = energy(this.isProduction ? this.totalNeg : this.total);
         }
-        if (this.totalNegUuid) {
-            state.electricalEnergyMeasurement.cumulativeEnergyExported = energy(this.totalNeg);
+        if (exported) {
+            state.electricalEnergyMeasurement.cumulativeEnergyExported = energy(this.isProduction ? this.total : this.totalNeg);
         }
     }
 

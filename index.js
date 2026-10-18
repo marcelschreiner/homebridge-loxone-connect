@@ -268,13 +268,26 @@ LoxPlatform.prototype.publishMatterAccessories = async function (items) {
         this.log('Platform - Matter is disabled in the options, no Matter accessories are published.');
     }
 
-    const stale = [...this.cachedMatterAccessories.values()].filter(accessory => !registrations.has(accessory.UUID));
+    // Homebridge keeps the features of a cached accessory, attributes added since then would be dropped
+    // (e.g. a meter that now also reports exported energy), so such accessories are created again
+    const changed = (cached) => {
+        const accessory = registrations.get(cached.UUID).accessory;
+        return Object.keys(accessory.clusters).some(cluster =>
+            Object.keys(accessory.clusters[cluster] || {}).some(attribute => !(attribute in ((cached.clusters || {})[cluster] || {}))));
+    };
+
+    const stale = [...this.cachedMatterAccessories.values()].filter(accessory => !registrations.has(accessory.UUID) || changed(accessory));
     if (stale.length > 0) {
-        this.log(`Platform - Removing ${stale.length} Matter accessories that no longer exist.`);
+        this.log(`Platform - Removing ${stale.length} Matter accessories that no longer exist or changed.`);
         try {
             await matter.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale);
         } catch (error) {
             this.log.error(`Platform - Could not remove Matter accessories: ${error}`);
+        }
+
+        // removing finishes in the background, changed accessories can only be registered again once it is done
+        if (stale.some(accessory => registrations.has(accessory.UUID))) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
     }
 
