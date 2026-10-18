@@ -50,11 +50,16 @@ SwitchItem.prototype.setItemState = function (value, callback) {
     //added some logic to prevent a loop when the change because of external event captured by callback
     const newState = Boolean(value);
     if (newState !== Boolean(this.currentState)) {
-        const command = newState ? 'On' : 'Off';
+        const command = newState ? this.onCommand() : 'Off';
         this.log(`[${this.item}] - send message to ${this.name}: ${command}, previous state: ${this.currentState}`);
         this.platform.ws.sendCommand(this.uuidAction, command);
     }
     callback();
+};
+
+// command used to switch on, overridden by the pushbutton
+SwitchItem.prototype.onCommand = () => {
+    return 'On';
 };
 
 SwitchItem.prototype.getMatterDeviceType = function (matter) {

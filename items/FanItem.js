@@ -21,7 +21,7 @@ FanItem.prototype.getMatterDeviceType = function(matter) {
 };
 
 FanItem.prototype.getMatterStaticClusters = function() {
-    return { fanControl: { fanModeSequence: 1 } }; // Off/Low/High
+    return { fanControl: { fanModeSequence: 5 } }; // Off/High
 };
 
 FanItem.prototype.getMatterState = function() {

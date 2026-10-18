@@ -12,6 +12,8 @@ Feature requests are always welcome!
 The plugin will be able to communicate with the following items from your Loxone setup:
   - Lights (Switches, Dimmers and RGB/ Smart-actor RGBW leds)
   - Sensors (Temperature, Humidty, Light, Motion, Contact, Leak and Smoke)*
+  - Presence detector
+  - Energy meter (power and energy, Matter only)
   - Switches (On/Off, Pushbutton, Stairwell, Radio)
   - Doorbell notification*
   - Valve, Sprinklers*
@@ -116,8 +118,12 @@ HomeKit (HAP) and Matter work side by side. If you pair both with Apple Home, ev
 | Lock | Door Lock |
 | Valve, Sprinklers | Water Valve |
 | Temperature, Humidity, Light, Motion, Contact, Leak and Smoke sensor | matching Matter sensor |
+| Presence detector | Occupancy Sensor |
+| Energy meter (Meter block) | Electrical Sensor (power and energy, Matter only) |
 | Doorbell, Trigger | Generic Switch (button press) |
 | Gate, Alarm system | not available via Matter, HomeKit only |
+
+Energy meters measuring power (format in W or kW) are exposed with their current power and, if available, the total energy (consumed and, for bidirectional meters, fed in). HomeKit (HAP) has no matching service, so they are only available via Matter. Meters counting water, gas, ... are skipped.
 
 Whether a device type is shown and controllable depends on the Matter controller (e.g. Apple Home doesn't support every Matter device type yet).
 

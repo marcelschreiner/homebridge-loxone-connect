@@ -30,12 +30,16 @@ module.exports = homebridge => {
     Utility.addSupportTo(ItemFactory.RadioSwitchItem, ItemFactory.AbstractItem);
     Utility.addSupportTo(ItemFactory.Lock, ItemFactory.AbstractItem);
     Utility.addSupportTo(ItemFactory.Valve, ItemFactory.AbstractItem);
+    Utility.addSupportTo(ItemFactory.Meter, ItemFactory.AbstractItem);
 
     //Add childs of switch
     Utility.addSupportTo(ItemFactory.Lightbulb, ItemFactory.Switch);
     Utility.addSupportTo(ItemFactory.Outlet, ItemFactory.Switch);
     Utility.addSupportTo(ItemFactory.Pushbutton, ItemFactory.Switch);
     Utility.addSupportTo(ItemFactory.Fan, ItemFactory.Switch);
+
+    //Add childs of motion sensor
+    Utility.addSupportTo(ItemFactory.PresenceDetector, ItemFactory.MotionSensor);
 
     //Add childs of shower
     Utility.addSupportTo(ItemFactory.Sprinkler, ItemFactory.Valve);
@@ -163,6 +167,11 @@ LoxPlatform.prototype.publishHapAccessories = function (items, itemServices) {
 
     if (this.exposeHap) {
         for (const item of items) {
+            if (!item.hasHapService()) {
+                this.log(`Platform - '${item.name}' is not supported via HomeKit (Matter only).`);
+                continue;
+            }
+
             // same UUID as the former static platform used, so HomeKit keeps rooms, scenes and automations
             const uuid = hap.uuid.generate(`${this.config.platform}:${item.uuid_base}`);
             if (current.has(uuid)) {
@@ -283,7 +292,7 @@ LoxPlatform.prototype.publishMatterAccessories = async function (items) {
     // registration finishes in the background, push the current Loxone state once it is done
     setTimeout(() => {
         for (const { item } of registrations.values()) {
-            item.updateMatterState();
+            item.updateMatterState(true);
         }
     }, 3000);
 

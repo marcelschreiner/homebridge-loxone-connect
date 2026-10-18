@@ -26,6 +26,11 @@ AbstractItem.prototype.getOtherServices = () => {
     return null;
 };
 
+// items without a HomeKit service (e.g. power meters) are only exposed via Matter
+AbstractItem.prototype.hasHapService = function() {
+    return !!this.otherService;
+};
+
 AbstractItem.prototype.getInformationServices = function() {
     const informationService = new this.homebridge.hap.Service.AccessoryInformation();
 
@@ -94,6 +99,15 @@ AbstractItem.prototype.wrapMatterHandlers = function(handlers) {
         return undefined;
     }
 
+    // some controllers (e.g. Google Home, Alexa) send toggle instead of on/off
+    const onOff = handlers.onOff;
+    if (onOff && onOff.on && onOff.off && !onOff.toggle) {
+        onOff.toggle = (args, context) => {
+            const state = this.getMatterState(this.matter).onOff;
+            return state && state.onOff ? onOff.off(args, context) : onOff.on(args, context);
+        };
+    }
+
     const wrapped = {};
     for (const cluster in handlers) {
         wrapped[cluster] = {};
@@ -107,7 +121,7 @@ AbstractItem.prototype.wrapMatterHandlers = function(handlers) {
                     throw error;
                 }
                 clearTimeout(this.matterResyncTimer);
-                this.matterResyncTimer = setTimeout(() => this.updateMatterState(), 1500);
+                this.matterResyncTimer = setTimeout(() => this.updateMatterState(true), 1500);
             };
         }
     }
@@ -115,15 +129,30 @@ AbstractItem.prototype.wrapMatterHandlers = function(handlers) {
 };
 
 // push the current item state to Matter, call this whenever the state changed
-AbstractItem.prototype.updateMatterState = function() {
+// clusters that didn't change since the last push are skipped, unless force is set
+// (needed after a command, because Matter may already assume a state Loxone never reached)
+AbstractItem.prototype.updateMatterState = function(force) {
     if (!this.matter || !this.matterRegistered) {
         return;
     }
 
+    if (!this.matterLastState) {
+        this.matterLastState = {};
+    }
+
     const state = this.getMatterState(this.matter);
     for (const cluster in state) {
+        const serialized = JSON.stringify(state[cluster]);
+        if (!force && this.matterLastState[cluster] === serialized) {
+            continue;
+        }
+        this.matterLastState[cluster] = serialized;
         this.matter.updateAccessoryState(this.UUID, cluster, state[cluster])
-            .catch(error => this.log.debug(`[Matter] - ${this.name}: could not update ${cluster}: ${error}`));
+            .catch(error => {
+                // try again with the next update
+                delete this.matterLastState[cluster];
+                this.log.debug(`[Matter] - ${this.name}: could not update ${cluster}: ${error}`);
+            });
     }
 };
 

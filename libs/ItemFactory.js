@@ -29,6 +29,8 @@ moduleexports.Lock = require('../items/LockItem.js');
 moduleexports.Valve = require('../items/ValveItem.js');
 moduleexports.Sprinkler = require('../items/SprinklerItem.js');
 moduleexports.RadioSwitchItem = require('../items/RadioSwitchItem.js');
+moduleexports.Meter = require('../items/MeterItem.js');
+moduleexports.PresenceDetector = require('../items/PresenceDetectorItem.js');
 
 moduleexports.Factory = function(LoxPlatform, homebridge) {
     this.platform = LoxPlatform;
@@ -220,6 +222,12 @@ moduleexports.Factory.prototype.checkCustomAttrs = (factory, itemId, platform, c
 
     if (item.type === "EIBDimmer") {
         item.type = "Dimmer"
+    }
+
+    if (item.type === "Meter" && !moduleexports.Meter.isElectrical(item)) {
+        // water, gas, ... meters have no matching device type
+        factory.log(`Platform - The meter '${item.name}' doesn't measure power, skipping.`);
+        item.skip = true;
     }
 
     if(item.name.indexOf("Loxone") !== -1) {

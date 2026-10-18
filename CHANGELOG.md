@@ -6,6 +6,10 @@
 - Matter support: on Homebridge 2 with Matter enabled on the bridge, all supported Loxone items are also exposed via Matter (new options `hap` and `matter`).
 - Fixed a crash when filtering by rooms and when no `alias` is configured with mood switches.
 - Removed the unused axios import.
+- New: energy meters (Loxone Meter block) are exposed via Matter as electrical sensor with power and energy measurement.
+- New: Loxone presence detectors are exposed as motion / occupancy sensor.
+- Matter: the toggle command is supported (used by e.g. Google Home and Alexa), unchanged states are no longer sent again.
+- Fixed: pushbuttons send a pulse instead of switching the output on permanently.
 
 ## [1.4.1] - 2023/01/03
 
