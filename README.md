@@ -129,7 +129,7 @@ Energy meters measuring power (format in W or kW) are exposed with their current
 
 Energy meters whose name contains "PV" (alias `Production`) are treated as producers, their power is reported as negative (fed in) and their energy as exported.
 
-Intelligent room controllers are exposed as heating thermostat. Changing the target temperature works like in the Loxone app: in the automatic modes it changes the comfort temperature offset, in the manual modes the manual temperature. The operating mode can only be changed in Loxone.
+Intelligent room controllers are exposed as heating thermostat. The target temperature can be changed in the comfort mode (it changes the comfort temperature offset like the +/- in the Loxone app, by at most 5°C) and in the manual modes (manual temperature). In the other modes (eco, building protection, ...) changes are reverted. The operating mode can only be changed in Loxone.
 
 Whether a device type is shown and controllable depends on the Matter controller (e.g. Apple Home doesn't support every Matter device type yet).
 

@@ -1,6 +1,9 @@
 // Loxone intelligent room controller (IRoomControllerV2), exposed as heating thermostat.
-// The target temperature is set like the Loxone app does: in the automatic modes as offset to the
-// comfort temperature, in the manual modes as manual temperature. The operating mode is only shown.
+// The target temperature can be changed in the comfort mode (as offset to the comfort temperature, like the
+// +/- in the Loxone app) and in the manual modes (as manual temperature). In the other modes (eco, building
+// protection, ...) the offset doesn't change the current target, so changes are reverted there.
+// The operating mode is only shown.
+const ACTIVE_MODE_COMFORT = 1;
 const ACTIVE_MODE_MANUAL = 3;
 const ACTIVE_MODE_OFF = 4;
 const OPERATING_MODE_OFF = -1;
@@ -8,6 +11,10 @@ const MANUAL_OPERATING_MODES = [4, 5]; // manual heating, manual cooling
 
 const MIN_TEMPERATURE = 5;
 const MAX_TEMPERATURE = 35;
+const MAX_COMFORT_OFFSET = 5;
+
+// Apple Home sends every step while the slider is moved, only the final value is sent to Loxone
+const SEND_DELAY = 1000;
 
 const IRoomControllerV2Item = function(widget, platform, homebridge) {
 
@@ -18,7 +25,6 @@ const IRoomControllerV2Item = function(widget, platform, homebridge) {
     this.tempActual = undefined;
     this.tempTarget = undefined;
     this.comfortTemperature = undefined;
-    this.comfortTemperatureOffset = undefined;
     this.activeMode = undefined;
     this.operatingMode = undefined;
     this.openWindow = 0;
@@ -31,7 +37,7 @@ const round = (value, step) => Math.round(value / step) * step;
 
 // Register a listener to be notified of changes in this items value
 IRoomControllerV2Item.prototype.initListener = function() {
-    for (const state of ['tempActual', 'tempTarget', 'comfortTemperature', 'comfortTemperatureOffset', 'activeMode', 'operatingMode', 'openWindow']) {
+    for (const state of ['tempActual', 'tempTarget', 'comfortTemperature', 'activeMode', 'operatingMode', 'openWindow']) {
         if (this.states[state]) {
             this.platform.ws.registerListenerForUUID(this.states[state], value => this.callBack(state, value));
         }
@@ -42,6 +48,11 @@ IRoomControllerV2Item.prototype.callBack = function(state, value) {
     const number = parseFloat(value);
     this[state] = isNaN(number) ? undefined : number;
 
+    this.refreshState();
+};
+
+// show the current Loxone state in HomeKit and Matter, also used to revert changes Loxone didn't accept
+IRoomControllerV2Item.prototype.refreshState = function(force) {
     const Characteristic = this.homebridge.hap.Characteristic;
     if (this.tempActual !== undefined) {
         this.otherService.getCharacteristic(Characteristic.CurrentTemperature).updateValue(this.tempActual);
@@ -52,7 +63,7 @@ IRoomControllerV2Item.prototype.callBack = function(state, value) {
     this.otherService.getCharacteristic(Characteristic.CurrentHeatingCoolingState).updateValue(this.getCurrentHeatingCoolingState());
     this.otherService.getCharacteristic(Characteristic.TargetHeatingCoolingState).updateValue(this.getTargetHeatingCoolingState());
 
-    this.updateMatterState();
+    this.updateMatterState(force);
 };
 
 IRoomControllerV2Item.prototype.isOff = function() {
@@ -111,30 +122,39 @@ IRoomControllerV2Item.prototype.getOtherServices = function() {
 
 IRoomControllerV2Item.prototype.setTargetTemperature = function(value) {
     const target = round(clampTemperature(Number(value)), 0.1);
+
+    clearTimeout(this.sendTimer);
     // Matter reports state updates from Loxone like changes from the controller, they must not be sent back
     if (this.tempTarget !== undefined && Math.abs(target - this.tempTarget) < 0.05) {
         return;
     }
 
+    this.sendTimer = setTimeout(() => this.sendTargetTemperature(target), SEND_DELAY);
+};
+
+IRoomControllerV2Item.prototype.sendTargetTemperature = function(target) {
     let command;
     if (this.activeMode === ACTIVE_MODE_MANUAL || MANUAL_OPERATING_MODES.includes(this.operatingMode)) {
-        command = `setManualTemperature/${target}`;
-    } else if (this.comfortTemperatureOffset !== undefined && this.tempTarget !== undefined) {
-        // the offset is changed by the requested difference, so it moves the target the right way in every mode (comfort, eco, ...)
-        const offset = round(this.comfortTemperatureOffset + target - this.tempTarget, 0.1);
-        command = `setComfortModeTemp/${Number(offset.toFixed(1))}`;
-    } else if (this.comfortTemperature !== undefined) {
-        const offset = round(target - this.comfortTemperature, 0.1);
+        command = `setManualTemperature/${Number(target.toFixed(1))}`;
+    } else if (this.activeMode === ACTIVE_MODE_COMFORT && this.comfortTemperature !== undefined) {
+        let offset = round(target - this.comfortTemperature, 0.1);
+        if (Math.abs(offset) > MAX_COMFORT_OFFSET) {
+            offset = Math.sign(offset) * MAX_COMFORT_OFFSET;
+            this.log(`[RoomController] - ${this.name}: the target can only be changed by ${MAX_COMFORT_OFFSET}°C from the comfort temperature.`);
+        }
         command = `setComfortModeTemp/${Number(offset.toFixed(1))}`;
     } else {
-        this.log(`[RoomController] - ${this.name}: comfort temperature unknown, can't set the target temperature.`);
+        this.log(`[RoomController] - ${this.name}: the target temperature can only be changed in the comfort mode or the manual mode.`);
+        this.refreshState(true);
         return;
     }
 
     this.log(`[RoomController] - send message to ${this.name}: ${command}`);
     this.platform.ws.sendCommand(this.uuidAction, command);
-    // Loxone confirms the new target, until then the requested one is shown
-    this.tempTarget = target;
+
+    // show the target Loxone ended up with (e.g. if it was limited)
+    clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => this.refreshState(true), 3000);
 };
 
 //* Matter *//
