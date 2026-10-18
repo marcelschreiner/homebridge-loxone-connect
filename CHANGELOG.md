@@ -8,6 +8,9 @@
 - Removed the unused axios import.
 - New: energy meters (Loxone Meter block) are exposed via Matter as electrical sensor with power and energy measurement.
 - New: Loxone presence detectors are exposed as motion / occupancy sensor.
+- New: intelligent room controllers (IRoomControllerV2) are exposed as heating thermostat (HomeKit and Matter).
+- Matter: photovoltaics meters (name contains "PV", alias `Production`) are reported as production.
+- The 100 accessory limit only applies to HomeKit, Matter gets all items.
 - Matter: the toggle command is supported (used by e.g. Google Home and Alexa), unchanged states are no longer sent again.
 - Fixed: pushbuttons send a pulse instead of switching the output on permanently.
 

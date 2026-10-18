@@ -34,6 +34,7 @@ module.exports = homebridge => {
     Utility.addSupportTo(ItemFactory.Lock, ItemFactory.AbstractItem);
     Utility.addSupportTo(ItemFactory.Valve, ItemFactory.AbstractItem);
     Utility.addSupportTo(ItemFactory.Meter, ItemFactory.AbstractItem);
+    Utility.addSupportTo(ItemFactory.IRoomControllerV2, ItemFactory.AbstractItem);
 
     //Add childs of switch
     Utility.addSupportTo(ItemFactory.Lightbulb, ItemFactory.Switch);

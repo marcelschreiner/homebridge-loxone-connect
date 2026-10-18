@@ -13,6 +13,7 @@ The plugin will be able to communicate with the following items from your Loxone
   - Lights (Switches, Dimmers and RGB/ Smart-actor RGBW leds)
   - Sensors (Temperature, Humidty, Light, Motion, Contact, Leak and Smoke)*
   - Presence detector
+  - Intelligent room controller (thermostat)
   - Energy meter (power and energy, Matter only)
   - Switches (On/Off, Pushbutton, Stairwell, Radio)
   - Doorbell notification*
@@ -119,11 +120,16 @@ HomeKit (HAP) and Matter work side by side. If you pair both with Apple Home, ev
 | Valve, Sprinklers | Water Valve |
 | Temperature, Humidity, Light, Motion, Contact, Leak and Smoke sensor | matching Matter sensor |
 | Presence detector | Occupancy Sensor |
+| Intelligent room controller | Thermostat (heating) |
 | Energy meter (Meter block) | Electrical Sensor (power and energy, Matter only) |
 | Doorbell, Trigger | Generic Switch (button press) |
 | Gate, Alarm system | not available via Matter, HomeKit only |
 
 Energy meters measuring power (format in W or kW) are exposed with their current power and, if available, the total energy (consumed and, for bidirectional meters, fed in). HomeKit (HAP) has no matching service, so they are only available via Matter. Meters counting water, gas, ... are skipped.
+
+Energy meters whose name contains "PV" (alias `Production`) are treated as producers, their power is reported as negative (fed in) and their energy as exported.
+
+Intelligent room controllers are exposed as heating thermostat. Changing the target temperature works like in the Loxone app: in the automatic modes it changes the comfort temperature offset, in the manual modes the manual temperature. The operating mode can only be changed in Loxone.
 
 Whether a device type is shown and controllable depends on the Matter controller (e.g. Apple Home doesn't support every Matter device type yet).
 

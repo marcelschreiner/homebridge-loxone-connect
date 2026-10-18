@@ -31,6 +31,7 @@ moduleexports.Sprinkler = require('../items/SprinklerItem.js');
 moduleexports.RadioSwitchItem = require('../items/RadioSwitchItem.js');
 moduleexports.Meter = require('../items/MeterItem.js');
 moduleexports.PresenceDetector = require('../items/PresenceDetectorItem.js');
+moduleexports.IRoomControllerV2 = require('../items/IRoomControllerV2Item.js');
 
 moduleexports.Factory = function(LoxPlatform, homebridge) {
     this.platform = LoxPlatform;
