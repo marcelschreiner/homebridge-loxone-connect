@@ -66,10 +66,9 @@ moduleexports.Factory.prototype.parseSitemap = function(jsonSitemap) {
             const accessory = new moduleexports[this.itemList[key].type](this.itemList[key], this.platform, this.homebridge);
             this.log(`Platform - Accessory Found: ${this.itemList[key].name}`);
 
-            if (accessoryList.length > 99) {
-                this.log(`Platform - Accessory count limit (100) exceeded so skipping: '${this.itemList[key].name}' of type ${this.itemList[key].type} was skipped.`);
-            } else {
-                
+            // the HomeKit accessory limit is applied when publishing, Matter supports more accessories
+            {
+
                 let keyToLookup = key;
                 if (keyToLookup.indexOf('/') > -1) {
                     keyToLookup = keyToLookup.split('/')[0];

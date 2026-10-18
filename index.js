@@ -5,6 +5,9 @@ const WSListener = require('./libs/WSListener.js');
 const PLUGIN_NAME = 'homebridge-loxone-connect';
 const PLATFORM_NAME = 'LoxoneWs';
 
+// a HomeKit bridge supports up to 150 accessories, Matter (Homebridge) up to 1000
+const HAP_ACCESSORY_LIMIT = 100;
+
 module.exports = homebridge => {
     console.log(`homebridge API version: ${homebridge.version}`);
 
@@ -175,6 +178,11 @@ LoxPlatform.prototype.publishHapAccessories = function (items, itemServices) {
             // same UUID as the former static platform used, so HomeKit keeps rooms, scenes and automations
             const uuid = hap.uuid.generate(`${this.config.platform}:${item.uuid_base}`);
             if (current.has(uuid)) {
+                continue;
+            }
+
+            if (current.size >= HAP_ACCESSORY_LIMIT) {
+                this.log(`Platform - Accessory count limit (${HAP_ACCESSORY_LIMIT}) exceeded so skipping: '${item.name}' is not published via HomeKit.`);
                 continue;
             }
 
