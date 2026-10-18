@@ -15,6 +15,8 @@ const MAX_COMFORT_OFFSET = 5;
 
 // Apple Home sends every step while the slider is moved, only the final value is sent to Loxone
 const SEND_DELAY = 1000;
+// a requested target is shown until Loxone confirms it, or for this time at most
+const CONFIRM_TIMEOUT = 8000;
 
 const IRoomControllerV2Item = function(widget, platform, homebridge) {
 
@@ -48,7 +50,25 @@ IRoomControllerV2Item.prototype.callBack = function(state, value) {
     const number = parseFloat(value);
     this[state] = isNaN(number) ? undefined : number;
 
+    if (state === 'tempTarget' && this.sentTarget !== undefined && this.tempTarget !== undefined
+        && Math.abs(this.tempTarget - this.sentTarget) < 0.05) {
+        this.log(`[RoomController] - ${this.name}: Loxone confirmed the target temperature ${this.tempTarget}°C.`);
+        this.clearPendingTarget();
+    }
+
     this.refreshState();
+};
+
+// the target shown in HomeKit and Matter: the requested one while it is pending, otherwise the one of Loxone
+IRoomControllerV2Item.prototype.getDisplayedTarget = function() {
+    return this.pendingTarget !== undefined ? this.pendingTarget : this.tempTarget;
+};
+
+IRoomControllerV2Item.prototype.clearPendingTarget = function() {
+    clearTimeout(this.sendTimer);
+    clearTimeout(this.confirmTimer);
+    this.pendingTarget = undefined;
+    this.sentTarget = undefined;
 };
 
 // show the current Loxone state in HomeKit and Matter, also used to revert changes Loxone didn't accept
@@ -57,8 +77,8 @@ IRoomControllerV2Item.prototype.refreshState = function(force) {
     if (this.tempActual !== undefined) {
         this.otherService.getCharacteristic(Characteristic.CurrentTemperature).updateValue(this.tempActual);
     }
-    if (this.tempTarget !== undefined) {
-        this.otherService.getCharacteristic(Characteristic.TargetTemperature).updateValue(clampTemperature(this.tempTarget));
+    if (this.getDisplayedTarget() !== undefined) {
+        this.otherService.getCharacteristic(Characteristic.TargetTemperature).updateValue(clampTemperature(this.getDisplayedTarget()));
     }
     this.otherService.getCharacteristic(Characteristic.CurrentHeatingCoolingState).updateValue(this.getCurrentHeatingCoolingState());
     this.otherService.getCharacteristic(Characteristic.TargetHeatingCoolingState).updateValue(this.getTargetHeatingCoolingState());
@@ -92,7 +112,7 @@ IRoomControllerV2Item.prototype.getOtherServices = function() {
 
     otherService.getCharacteristic(Characteristic.TargetTemperature)
         .setProps({ minValue: MIN_TEMPERATURE, maxValue: MAX_TEMPERATURE, minStep: 0.5 })
-        .on('get', callback => callback(undefined, clampTemperature(this.tempTarget === undefined ? 20 : this.tempTarget)))
+        .on('get', callback => callback(undefined, clampTemperature(this.getDisplayedTarget() === undefined ? 20 : this.getDisplayedTarget())))
         .on('set', (value, callback) => {
             this.setTargetTemperature(value);
             callback();
@@ -123,17 +143,22 @@ IRoomControllerV2Item.prototype.getOtherServices = function() {
 IRoomControllerV2Item.prototype.setTargetTemperature = function(value) {
     const target = round(clampTemperature(Number(value)), 0.1);
 
-    clearTimeout(this.sendTimer);
-    // Matter reports state updates from Loxone like changes from the controller, they must not be sent back
-    if (this.tempTarget !== undefined && Math.abs(target - this.tempTarget) < 0.05) {
+    // Matter reports the state pushed by the plugin like a change from the controller, that echo is ignored
+    const displayed = this.getDisplayedTarget();
+    if (displayed !== undefined && Math.abs(target - displayed) < 0.05) {
         return;
     }
 
+    this.pendingTarget = target;
+    this.sentTarget = undefined;
+    clearTimeout(this.confirmTimer);
+    clearTimeout(this.sendTimer);
     this.sendTimer = setTimeout(() => this.sendTargetTemperature(target), SEND_DELAY);
 };
 
 IRoomControllerV2Item.prototype.sendTargetTemperature = function(target) {
     let command;
+    let expected = target;
     if (this.activeMode === ACTIVE_MODE_MANUAL || MANUAL_OPERATING_MODES.includes(this.operatingMode)) {
         command = `setManualTemperature/${Number(target.toFixed(1))}`;
     } else if (this.activeMode === ACTIVE_MODE_COMFORT && this.comfortTemperature !== undefined) {
@@ -142,19 +167,34 @@ IRoomControllerV2Item.prototype.sendTargetTemperature = function(target) {
             offset = Math.sign(offset) * MAX_COMFORT_OFFSET;
             this.log(`[RoomController] - ${this.name}: the target can only be changed by ${MAX_COMFORT_OFFSET}°C from the comfort temperature.`);
         }
-        command = `setComfortModeTemp/${Number(offset.toFixed(1))}`;
+        offset = Number(offset.toFixed(1));
+        expected = round(this.comfortTemperature + offset, 0.1);
+        command = `setComfortModeTemp/${offset}`;
     } else {
-        this.log(`[RoomController] - ${this.name}: the target temperature can only be changed in the comfort mode or the manual mode.`);
+        this.log(`[RoomController] - ${this.name}: the target temperature can only be changed in the comfort mode or the manual mode (active mode ${this.activeMode}).`);
+        this.clearPendingTarget();
         this.refreshState(true);
         return;
     }
 
-    this.log(`[RoomController] - send message to ${this.name}: ${command}`);
+    this.log(`[RoomController] - send message to ${this.name}: ${command} (target ${this.tempTarget}°C -> ${expected}°C, comfort ${this.comfortTemperature}°C, active mode ${this.activeMode})`);
     this.platform.ws.sendCommand(this.uuidAction, command);
+    if (this.tempTarget !== undefined && Math.abs(this.tempTarget - expected) < 0.05) {
+        // nothing changes in Loxone, so there is nothing to confirm
+        this.clearPendingTarget();
+        this.refreshState(true);
+        return;
+    }
+    this.pendingTarget = expected;
+    this.sentTarget = expected;
 
-    // show the target Loxone ended up with (e.g. if it was limited)
-    clearTimeout(this.refreshTimer);
-    this.refreshTimer = setTimeout(() => this.refreshState(true), 3000);
+    // if Loxone doesn't confirm the target, its own target is shown again
+    this.confirmTimer = setTimeout(() => {
+        this.log(`[RoomController] - ${this.name}: Loxone didn't confirm the target temperature ${expected}°C, the target is still ${this.tempTarget}°C.`);
+        this.clearPendingTarget();
+        this.refreshState(true);
+    }, CONFIRM_TIMEOUT);
+    this.refreshState(true);
 };
 
 //* Matter *//
@@ -180,7 +220,7 @@ IRoomControllerV2Item.prototype.getMatterState = function() {
         thermostat: {
             // hundredths of °C, null means unknown
             localTemperature: this.tempActual === undefined ? null : Math.round(this.tempActual * 100),
-            occupiedHeatingSetpoint: Math.round(clampTemperature(this.tempTarget === undefined ? 20 : this.tempTarget) * 100),
+            occupiedHeatingSetpoint: Math.round(clampTemperature(this.getDisplayedTarget() === undefined ? 20 : this.getDisplayedTarget()) * 100),
             systemMode: this.isOff() ? 0 : 4 // Off : Heat
         }
     };
@@ -191,8 +231,8 @@ IRoomControllerV2Item.prototype.getMatterHandlers = function() {
         thermostat: {
             occupiedHeatingSetpointChange: (request) => this.setTargetTemperature(request.occupiedHeatingSetpoint / 100),
             setpointRaiseLower: (request) => {
-                if (this.tempTarget !== undefined) {
-                    this.setTargetTemperature(this.tempTarget + request.amount / 10);
+                if (this.getDisplayedTarget() !== undefined) {
+                    this.setTargetTemperature(this.getDisplayedTarget() + request.amount / 10);
                 }
             },
             // the operating mode is controlled by Loxone, the resync after the handler reverts the change
