@@ -17,6 +17,7 @@ const MAX_COMFORT_OFFSET = 5;
 const SEND_DELAY = 1000;
 // a requested target is shown until Loxone confirms it, or for this time at most
 const CONFIRM_TIMEOUT = 8000;
+const DIAGNOSTIC_TIME = 30000;
 
 const IRoomControllerV2Item = function(widget, platform, homebridge) {
 
@@ -42,6 +43,17 @@ IRoomControllerV2Item.prototype.initListener = function() {
     for (const state of ['tempActual', 'tempTarget', 'comfortTemperature', 'activeMode', 'operatingMode', 'openWindow']) {
         if (this.states[state]) {
             this.platform.ws.registerListenerForUUID(this.states[state], value => this.callBack(state, value));
+        }
+    }
+
+    // log what Loxone reports shortly after a command, to see how it reacts to it
+    for (const state of ['tempTarget', 'comfortTemperature', 'comfortTemperatureOffset', 'activeMode', 'operatingMode', 'overrideReason', 'overrideEntries']) {
+        if (this.states[state]) {
+            this.platform.ws.registerListenerForUUID(this.states[state], value => {
+                if (this.lastCommandTime && Date.now() - this.lastCommandTime < DIAGNOSTIC_TIME) {
+                    this.log(`[RoomController] - ${this.name}: Loxone reports ${state} = ${String(value).slice(0, 200)} (${Date.now() - this.lastCommandTime} ms after the command)`);
+                }
+            });
         }
     }
 };
@@ -179,6 +191,7 @@ IRoomControllerV2Item.prototype.sendTargetTemperature = function(target) {
 
     this.log(`[RoomController] - send message to ${this.name}: ${command} (target ${this.tempTarget}°C -> ${expected}°C, comfort ${this.comfortTemperature}°C, active mode ${this.activeMode})`);
     this.platform.ws.sendCommand(this.uuidAction, command);
+    this.lastCommandTime = Date.now();
     if (this.tempTarget !== undefined && Math.abs(this.tempTarget - expected) < 0.05) {
         // nothing changes in Loxone, so there is nothing to confirm
         this.clearPendingTarget();
